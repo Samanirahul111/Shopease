@@ -68,8 +68,19 @@ const envSchema = z.object({
   TELEGRAM_ADMIN_CHAT_ID: z.string().optional().or(z.literal("")),
 });
 
+type Env = z.infer<typeof envSchema>;
+type Features = {
+  email: boolean;
+  stripe: boolean;
+  razorpay: boolean;
+  googleOAuth: boolean;
+  s3Uploads: boolean;
+  redis: boolean;
+  telegram: boolean;
+};
+
 // Environment validation function
-function validateEnv() {
+function validateEnv(): Env {
   try {
     return envSchema.parse(process.env);
   } catch (error) {
@@ -83,24 +94,57 @@ function validateEnv() {
   }
 }
 
-// Validated environment variables
-export const env = validateEnv();
+let _env: Env | undefined;
+let _features: Features | undefined;
 
-// Feature availability checks
-export const features = {
-  email: !!(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS),
-  stripe: !!(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET),
-  razorpay: !!(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET),
-  googleOAuth: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
-  s3Uploads: !!(env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY && env.AWS_S3_BUCKET),
-  redis: !!env.REDIS_URL,
-  telegram: !!(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_ADMIN_CHAT_ID),
-};
+export function getEnv(): Env {
+  if (!_env) {
+    _env = validateEnv();
+    if (_env.NODE_ENV === "development") {
+      checkPlaceholderValues();
+      console.log("🔧 Environment Configuration Status:");
+      Object.entries(getFeatures()).forEach(([feature, enabled]) => {
+        console.log(`  ${enabled ? "✅" : "⚠️ "} ${feature}: ${enabled ? "enabled" : "disabled"}`);
+      });
+    }
+  }
+  return _env;
+}
+
+export function getFeatures(): Features {
+  if (!_features) {
+    const e = getEnv();
+    _features = {
+      email: !!(e.SMTP_HOST && e.SMTP_USER && e.SMTP_PASS),
+      stripe: !!(e.STRIPE_SECRET_KEY && e.STRIPE_WEBHOOK_SECRET),
+      razorpay: !!(e.RAZORPAY_KEY_ID && e.RAZORPAY_KEY_SECRET),
+      googleOAuth: !!(e.GOOGLE_CLIENT_ID && e.GOOGLE_CLIENT_SECRET),
+      s3Uploads: !!(e.AWS_ACCESS_KEY_ID && e.AWS_SECRET_ACCESS_KEY && e.AWS_S3_BUCKET),
+      redis: !!e.REDIS_URL,
+      telegram: !!(e.TELEGRAM_BOT_TOKEN && e.TELEGRAM_ADMIN_CHAT_ID),
+    };
+  }
+  return _features;
+}
+
+// Validated environment variables - lazily evaluated at first access, not at import
+export const env = new Proxy({} as Env, {
+  get(_, prop: string) {
+    return getEnv()[prop as keyof Env];
+  },
+});
+
+// Feature availability checks - lazily evaluated at first access, not at import
+export const features = new Proxy({} as Features, {
+  get(_, prop: string) {
+    return getFeatures()[prop as keyof Features];
+  },
+});
 
 // Helper function to check if a feature is available
-export function requireFeature(featureName: keyof typeof features, action: string): void {
-  if (!features[featureName]) {
-    const missingVars: Record<keyof typeof features, string[]> = {
+export function requireFeature(featureName: keyof Features, action: string): void {
+  if (!getFeatures()[featureName]) {
+    const missingVars: Record<keyof Features, string[]> = {
       email: ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"],
       stripe: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
       razorpay: ["RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"],
@@ -146,14 +190,4 @@ function checkPlaceholderValues() {
     warnings.forEach(warning => console.warn(`  - ${warning}`));
     console.warn("  Please update your .env file with actual configuration values.");
   }
-}
-
-// Development helper - check for common issues
-if (env.NODE_ENV === "development") {
-  checkPlaceholderValues();
-
-  console.log("🔧 Environment Configuration Status:");
-  Object.entries(features).forEach(([feature, enabled]) => {
-    console.log(`  ${enabled ? "✅" : "⚠️ "} ${feature}: ${enabled ? "enabled" : "disabled"}`);
-  });
 }

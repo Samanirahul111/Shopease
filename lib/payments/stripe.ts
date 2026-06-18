@@ -1,13 +1,18 @@
 import Stripe from "stripe";
 import { env, requireFeature } from "@/lib/config/env";
 
-// Validate Stripe configuration
-requireFeature("stripe", "initialize Stripe payment gateway");
+let _stripe: Stripe | undefined;
 
-export const stripe = new Stripe(env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2023-10-16",
-  typescript: true,
-});
+function getStripe(): Stripe {
+  requireFeature("stripe", "initialize Stripe payment gateway");
+  if (!_stripe) {
+    _stripe = new Stripe(env.STRIPE_SECRET_KEY!, {
+      apiVersion: "2023-10-16",
+      typescript: true,
+    });
+  }
+  return _stripe;
+}
 
 export async function createStripePaymentIntent(params: {
   amount: number; // in smallest currency unit (paise for INR)
@@ -18,7 +23,7 @@ export async function createStripePaymentIntent(params: {
   customerId?: string;
   metadata?: Record<string, string>;
 }) {
-  const paymentIntent = await stripe.paymentIntents.create({
+  const paymentIntent = await getStripe().paymentIntents.create({
     amount: Math.round(params.amount * 100), // convert to paise
     currency: params.currency.toLowerCase(),
     automatic_payment_methods: { enabled: true },
@@ -35,7 +40,7 @@ export async function createStripePaymentIntent(params: {
 }
 
 export async function confirmStripePayment(paymentIntentId: string) {
-  return stripe.paymentIntents.retrieve(paymentIntentId);
+  return getStripe().paymentIntents.retrieve(paymentIntentId);
 }
 
 export async function createStripeRefund(params: {
@@ -43,7 +48,7 @@ export async function createStripeRefund(params: {
   amount?: number; // partial refund amount in INR
   reason?: Stripe.RefundCreateParams.Reason;
 }) {
-  return stripe.refunds.create({
+  return getStripe().refunds.create({
     payment_intent: params.paymentIntentId,
     amount: params.amount ? Math.round(params.amount * 100) : undefined,
     reason: params.reason || "requested_by_customer",
@@ -51,7 +56,7 @@ export async function createStripeRefund(params: {
 }
 
 export async function constructStripeEvent(payload: string | Buffer, signature: string) {
-  return stripe.webhooks.constructEvent(
+  return getStripe().webhooks.constructEvent(
     payload,
     signature,
     env.STRIPE_WEBHOOK_SECRET!

@@ -2,13 +2,18 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import { env, requireFeature } from "@/lib/config/env";
 
-// Validate Razorpay configuration
-requireFeature("razorpay", "initialize Razorpay payment gateway");
+let _razorpay: Razorpay | undefined;
 
-export const razorpay = new Razorpay({
-  key_id: env.RAZORPAY_KEY_ID!,
-  key_secret: env.RAZORPAY_KEY_SECRET!,
-});
+function getRazorpay(): Razorpay {
+  requireFeature("razorpay", "initialize Razorpay payment gateway");
+  if (!_razorpay) {
+    _razorpay = new Razorpay({
+      key_id: env.RAZORPAY_KEY_ID!,
+      key_secret: env.RAZORPAY_KEY_SECRET!,
+    });
+  }
+  return _razorpay;
+}
 
 export async function createRazorpayOrder(params: {
   amount: number; // in INR
@@ -17,7 +22,7 @@ export async function createRazorpayOrder(params: {
   orderNumber: string;
   notes?: Record<string, string>;
 }) {
-  const order = await razorpay.orders.create({
+  const order = await getRazorpay().orders.create({
     amount: Math.round(params.amount * 100), // convert to paise
     currency: params.currency.toUpperCase(),
     receipt: params.orderNumber,
@@ -50,7 +55,7 @@ export async function createRazorpayRefund(params: {
   amount?: number; // in INR, partial refund
   notes?: Record<string, string>;
 }) {
-  return razorpay.payments.refund(params.paymentId, {
+  return getRazorpay().payments.refund(params.paymentId, {
     amount: params.amount ? Math.round(params.amount * 100) : undefined,
     notes: params.notes,
     speed: "normal",
@@ -58,5 +63,5 @@ export async function createRazorpayRefund(params: {
 }
 
 export async function fetchRazorpayPayment(paymentId: string) {
-  return razorpay.payments.fetch(paymentId);
+  return getRazorpay().payments.fetch(paymentId);
 }
