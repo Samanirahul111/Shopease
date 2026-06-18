@@ -1,19 +1,24 @@
 import nodemailer from "nodemailer";
 import { env, requireFeature } from "@/lib/config/env";
 
-// Validate email configuration
-requireFeature("email", "initialize email service");
+let _transporter: ReturnType<typeof nodemailer.createTransport> | undefined;
 
-const transporter = nodemailer.createTransport({
-  host: env.SMTP_HOST!,
-  port: env.SMTP_PORT!,
-  secure: env.SMTP_SECURE!,
-  auth: {
-    user: env.SMTP_USER!,
-    pass: env.SMTP_PASS!,
-  },
-  tls: { rejectUnauthorized: false },
-});
+function getTransporter() {
+  requireFeature("email", "initialize email service");
+  if (!_transporter) {
+    _transporter = nodemailer.createTransport({
+      host: env.SMTP_HOST!,
+      port: env.SMTP_PORT!,
+      secure: env.SMTP_SECURE!,
+      auth: {
+        user: env.SMTP_USER!,
+        pass: env.SMTP_PASS!,
+      },
+      tls: { rejectUnauthorized: false },
+    });
+  }
+  return _transporter;
+}
 
 export interface EmailOptions {
   to: string | string[];
@@ -25,7 +30,7 @@ export interface EmailOptions {
 
 export async function sendEmail(options: EmailOptions) {
   try {
-    const result = await transporter.sendMail({
+    const result = await getTransporter().sendMail({
       from: env.EMAIL_FROM || "ShopEase <noreply@shopease.com>",
       to: options.to,
       subject: options.subject,

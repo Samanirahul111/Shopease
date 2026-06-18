@@ -2,10 +2,6 @@ import jwt from "jsonwebtoken";
 import { NextRequest } from "next/server";
 import { env } from "@/lib/config/env";
 
-const JWT_SECRET = env.JWT_SECRET;
-const JWT_EXPIRES_IN = env.JWT_EXPIRES_IN;
-const JWT_REFRESH_EXPIRES_IN = env.JWT_REFRESH_EXPIRES_IN;
-
 export interface JWTPayload {
   userId: string;
   email: string;
@@ -16,15 +12,15 @@ export interface JWTPayload {
 }
 
 export function signAccessToken(payload: Omit<JWTPayload, "iat" | "exp">): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
+  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions);
 }
 
 export function signRefreshToken(payload: Omit<JWTPayload, "iat" | "exp">): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN } as jwt.SignOptions);
+  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_REFRESH_EXPIRES_IN } as jwt.SignOptions);
 }
 
 export function verifyToken(token: string): JWTPayload {
-  return jwt.verify(token, JWT_SECRET) as JWTPayload;
+  return jwt.verify(token, env.JWT_SECRET) as JWTPayload;
 }
 
 export function getTokenFromRequest(req: NextRequest): string | null {
