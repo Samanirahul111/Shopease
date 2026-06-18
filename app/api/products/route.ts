@@ -4,6 +4,8 @@ import { requireAdmin, apiResponse, apiError } from "@/lib/auth/middleware";
 import { createProductSchema } from "@/lib/validations/schemas";
 import { notifyLowStock } from "@/lib/notifications/notify";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/products - Public product listing with filters
 export async function GET(req: NextRequest) {
   try {
